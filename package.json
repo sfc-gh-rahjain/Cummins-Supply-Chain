@@ -1,0 +1,7 @@
+{
+  "homepage": "https://sfc-gh-rahjain.github.io/Public/",
+  "scripts": {
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
+  }
+}
