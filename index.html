@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cummins Supply Chain Control Tower</title>
+    <!-- Core Engine -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Recharts Dependencies: PropTypes is required by Recharts UMD -->
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.10.3/umd/Recharts.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .tab-transition { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade { animation: fadeIn 0.4s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-[#FDFDFD]">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, Fragment, useEffect } = React;
+
+        // --- CONSTANTS ---
+        const CUMMINS_RED = '#DA291C';
+        const CUMMINS_BLACK = '#000000';
+        const SUCCESS = '#10B981';
+        const WARNING = '#F59E0B';
+        const DANGER = '#EF4444';
+
+        // --- CUSTOM SVG ICON ENGINE ---
+        const Icon = ({ name, size = 16, className = "" }) => {
+            const icons = {
+                TrendingUp: <path d="m22 7-8.5 8.5-5-5L2 17M22 7h-6M22 7v6"/>,
+                AlertTriangle: <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3ZM12 9v4M12 17h.01"/>,
+                Package: <path d="M16.5 9.4 7.5 4.21M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16ZM3.27 6.96l8.73 5.05 8.73-5.05M12 22.08V12"/>,
+                Truck: <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2M15 18H9M19 18h2a1 1 0 0 0 1-1v-5h-4l-3-5h-3M16 13h6M7 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM18 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/>,
+                ShieldCheck: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10ZM9 12l2 2 4-4"/>,
+                Leaf: <Fragment><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></Fragment>,
+                HeartHandshake: <Fragment><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08v0c.85.85 2.23.85 3.08 0L15 8.12"/></Fragment>,
+                Cpu: <Fragment><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/></Fragment>,
+                Activity: <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>,
+                Globe: <Fragment><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20M12 2a14.5 14.5 0 0 1 0 20M2 12h20"/></Fragment>,
+                Zap: <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>,
+                Timer: <path d="M10 2h4M12 14l3-3M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16z"/>,
+                MapPin: <Fragment><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></Fragment>,
+                Factory: <Fragment><path d="M2 20V10l5 2V10l5 2V10l10 4v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M17 18h1"/><path d="M12 18h1"/><path d="M7 18h1"/></Fragment>,
+                Shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
+                Briefcase: <Fragment><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></Fragment>,
+                Search: <Fragment><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></Fragment>,
+                Share2: <Fragment><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.82 3.98M15.41 6.51l-6.82 3.98"/></Fragment>
+            };
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    {icons[name] || null}
+                </svg>
+            );
+        };
+
+        // --- MOCK DATA ---
+        const fulfillmentTrend = [
+            { month: 'W1', forecast: 4200, actual: 4050, fillRate: 92, csat: 4.2 },
+            { month: 'W2', forecast: 4500, actual: 4620, fillRate: 94, csat: 4.4 },
+            { month: 'W3', forecast: 4400, actual: 4100, fillRate: 93, csat: 4.3 },
+            { month: 'W4', forecast: 4800, actual: 4950, fillRate: 97, csat: 4.7 },
+            { month: 'W5', forecast: 4600, actual: 4300, fillRate: 98, csat: 4.9 },
+        ];
+
+        const inflationData = [
+            { category: 'Castings', current: 14 },
+            { category: 'Electronics', current: 8 },
+            { category: 'Steel', current: 22 },
+            { category: 'Logistics', current: 11 },
+        ];
+
+        const riskRadarData = [
+            { subject: 'Multi-Tier Vis', A: 130, B: 110 },
+            { subject: 'Lead Time Var', A: 98, B: 130 },
+            { subject: 'Sourcing Redundancy', A: 86, B: 130 },
+            { subject: 'Asset Precision', A: 140, B: 100 },
+            { subject: 'Negotiation ROI', A: 115, B: 90 },
+        ];
+
+        const plantStandardization = [
+            { plant: 'Kothrud', energy: 98, waste: 95, compliance: 100 },
+            { plant: 'Phaltan', energy: 92, waste: 88, compliance: 100 },
+            { plant: 'Jamshedpur', energy: 85, waste: 92, compliance: 98 },
+            { plant: 'Pithampur', energy: 89, waste: 84, compliance: 100 },
+        ];
+
+        const supplierRiskScores = [
+            { name: 'Forging Node A', score: 82, status: 'Stable', lat: 'Low' },
+            { name: 'Electronics Group', score: 45, status: 'Critical', lat: 'High' },
+            { name: 'Casting Unit 4', score: 68, status: 'At-Risk', lat: 'Med' },
+            { name: 'Alloy Supply Inc', score: 91, status: 'Optimal', lat: 'Low' },
+        ];
+
+        const aiAccuracyData = [
+            { name: 'W1', ml: 78, trad: 65 },
+            { name: 'W2', ml: 82, trad: 64 },
+            { name: 'W3', ml: 81, trad: 66 },
+            { name: 'W4', ml: 85, trad: 63 },
+        ];
+
+        const esgData = [
+            { name: 'Scope 1', value: 400, color: CUMMINS_BLACK },
+            { name: 'Scope 2', value: 300, color: CUMMINS_RED },
+            { name: 'Scope 3', value: 300, color: '#666666' },
+        ];
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('financial');
+            const [isReady, setIsReady] = useState(false);
+
+            useEffect(() => {
+                const check = setInterval(() => { 
+                    if (window.Recharts && window.Recharts.BarChart) { 
+                        setIsReady(true); 
+                        clearInterval(check); 
+                    } 
+                }, 100);
+                return () => clearInterval(check);
+            }, []);
+
+            if (!isReady) {
+                return (
+                    <div className="h-screen flex items-center justify-center bg-white">
+                        <div className="text-center">
+                            <div className="w-12 h-12 border-4 border-[#DA291C] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Syncing Intelligence Engine...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            const { 
+                BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
+                AreaChart, Area, Cell, PieChart, Pie, RadarChart, PolarGrid, PolarAngleAxis, Radar, ComposedChart 
+            } = window.Recharts;
+
+            const TabButton = ({ id, label, icon }) => (
+                <button 
+                    onClick={() => setActiveTab(id)}
+                    className={`flex items-center gap-2 px-6 py-4 text-[10px] font-black uppercase tracking-widest border-b-4 tab-transition ${activeTab === id ? 'border-red-600 text-black bg-gray-50' : 'border-transparent text-gray-400 hover:text-black'}`}
+                >
+                    <Icon name={icon} size={16} />
+                    {label}
+                </button>
+            );
+
+            return (
+                <div className="min-h-screen text-slate-900 pb-10">
+                    <header className="bg-white border-b border-gray-200 sticky top-0 z-50 px-6 py-3 flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-[#DA291C] flex items-center justify-center rounded shadow-sm">
+                                <span className="text-white font-black text-xl italic leading-none">C</span>
+                            </div>
+                            <div className="h-10 w-[1px] bg-gray-200"></div>
+                            <div>
+                                <h1 className="text-2xl font-black tracking-tighter uppercase leading-none text-black">Cummins</h1>
+                                <p className="text-[10px] font-bold text-red-600 tracking-[0.2em] uppercase">Supply Chain Control Tower</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <div className="hidden md:flex flex-col items-end">
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Global Status</span>
+                                <span className="text-xs font-black text-emerald-500 flex items-center gap-1"><Icon name="Activity" size={12}/> ENTERPRISE CORE ACTIVE</span>
+                            </div>
+                            <button className="bg-black text-white px-5 py-2.5 rounded text-xs font-black flex items-center gap-2 uppercase tracking-widest shadow-lg hover:bg-red-600 transition-colors">
+                                <Icon name="Globe" size={14} /> Global View
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="bg-white border-b border-gray-100 shadow-sm overflow-x-auto no-scrollbar">
+                        <div className="max-w-[1600px] mx-auto px-6 flex">
+                            <TabButton id="financial" label="Financial & Operations" icon="Package" />
+                            <TabButton id="resilience" label="Resilience & Risk" icon="ShieldCheck" />
+                            <TabButton id="sustainability" label="Sustainability" icon="Leaf" />
+                            <TabButton id="customer" label="Customer Centricity" icon="HeartHandshake" />
+                            <TabButton id="modern" label="2026 AI & Predictive" icon="Cpu" />
+                        </div>
+                    </div>
+
+                    <main className="max-w-[1600px] mx-auto px-6 mt-8 animate-fade">
+                        {/* TAB 1: FINANCIAL */}
+                        {activeTab === 'financial' && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    {[
+                                        { label: 'Case Fill Rate', val: '98.2%', status: SUCCESS, desc: 'Order accuracy' },
+                                        { label: 'Out-of-Stock', val: '5.8%', status: SUCCESS, desc: 'Reduced from 20% baseline' },
+                                        { label: 'Perfect Order', val: '94.5%', status: WARNING, desc: 'OTIF + Error-Free' },
+                                        { label: 'Forecast Gain', val: '+10.2%', status: SUCCESS, desc: '$6M Savings Potential' }
+                                    ].map((kpi, i) => (
+                                        <div key={i} className="bg-white p-5 border-l-4 shadow-sm" style={{ borderLeftColor: kpi.status }}>
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{kpi.label}</p>
+                                            <p className="text-2xl font-black mt-1 text-black">{kpi.val}</p>
+                                            <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{kpi.desc}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-12 gap-6">
+                                    <div className="col-span-12 lg:col-span-8 bg-white p-6 rounded border border-gray-100 shadow-sm">
+                                        <h3 className="text-sm font-black uppercase tracking-tighter text-black mb-8">SKU-Level Supply-Demand Matching (3.5M Portfolio)</h3>
+                                        <div className="h-80">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <ComposedChart data={fulfillmentTrend}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700 }} />
+                                                    <YAxis axisLine={false} tickLine={false} />
+                                                    <Tooltip />
+                                                    <Bar dataKey="actual" fill={CUMMINS_BLACK} radius={[2, 2, 0, 0]} />
+                                                    <Line type="monotone" dataKey="forecast" stroke={CUMMINS_RED} strokeWidth={4} dot={{ r: 4, fill: CUMMINS_RED }} />
+                                                </ComposedChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-12 lg:col-span-4 bg-white p-6 rounded border border-gray-100 shadow-sm">
+                                        <h3 className="text-sm font-black uppercase tracking-tighter mb-6 text-black">Inflation-Adjusted Pricing Impact</h3>
+                                        <div className="space-y-6">
+                                            {inflationData.map((row, idx) => (
+                                                <div key={idx}>
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className="text-xs font-black uppercase text-slate-700">{row.category} Variance</span>
+                                                        <span className="text-xs font-black text-red-600">+{row.current}%</span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                                                        <div className="bg-red-600 h-full" style={{ width: `${(row.current/30)*100}%` }}></div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="mt-12 p-4 bg-slate-900 rounded text-white text-center">
+                                            <p className="text-[9px] font-black uppercase text-red-600 tracking-widest">Cycle Time Goal</p>
+                                            <p className="text-3xl font-black mt-2 italic tracking-tighter underline decoration-red-600">HOURS</p>
+                                            <p className="text-[10px] text-slate-400 mt-2 font-medium">Reduced from 3 weeks baseline</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB 2: RESILIENCE */}
+                        {activeTab === 'resilience' && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    {[
+                                        { label: 'Supplier OTD', val: '96.8%', status: SUCCESS, desc: 'Upstream reliability' },
+                                        { label: 'Complexity Score', val: '7.4', status: SUCCESS, desc: 'Countries per SKU' },
+                                        { label: 'RCA Resolution', val: '2.4 Hrs', status: SUCCESS, desc: 'Target: < 4 Hours' },
+                                        { label: 'Negotiation ROI', val: '14.2%', status: SUCCESS, desc: 'Savings through data' }
+                                    ].map((kpi, i) => (
+                                        <div key={i} className="bg-white p-5 border-l-4 shadow-sm" style={{ borderLeftColor: kpi.status }}>
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{kpi.label}</p>
+                                            <p className="text-2xl font-black mt-1 text-black">{kpi.val}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-12 gap-6">
+                                    <div className="col-span-12 lg:col-span-7 bg-white p-8 rounded border border-gray-100 shadow-sm">
+                                        <h3 className="text-sm font-black uppercase tracking-tighter text-black mb-8">Maturity Radar & Multi-Tier Visibility</h3>
+                                        <div className="h-80">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={riskRadarData}>
+                                                    <PolarGrid stroke="#f0f0f0" />
+                                                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fontWeight: 700 }} />
+                                                    <Radar name="Cummins" dataKey="A" stroke={CUMMINS_RED} fill={CUMMINS_RED} fillOpacity={0.4} />
+                                                    <Radar name="Baseline" dataKey="B" stroke={CUMMINS_BLACK} fill={CUMMINS_BLACK} fillOpacity={0.1} />
+                                                </RadarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-12 lg:col-span-5 space-y-4">
+                                        <div className="bg-black text-white p-6 rounded shadow-xl">
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-red-600 mb-6">AI Supplier Risk Scores</h4>
+                                            <div className="space-y-4">
+                                                {supplierRiskScores.map((node, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between p-3 border border-white/10 bg-white/5 rounded">
+                                                        <span className="text-xs font-black uppercase text-white tracking-tight">{node.name}</span>
+                                                        <span className={`text-sm font-black ${node.score < 50 ? 'text-red-500' : 'text-emerald-500'}`}>{node.score}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="bg-white p-6 rounded border border-gray-100 shadow-sm relative overflow-hidden flex flex-col justify-center">
+                                            <div className="flex items-center gap-3 mb-2"><Icon name="MapPin" className="text-red-600" /><h4 className="text-[10px] font-black uppercase text-black">Asset Positioning</h4></div>
+                                            <p className="text-2xl font-black italic tracking-tighter uppercase text-slate-800">98.2% Accurate</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB 3: SUSTAINABILITY */}
+                        {activeTab === 'sustainability' && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    {[
+                                        { label: 'Federal Compliance', val: '100%', status: SUCCESS, desc: 'IoT Regulatory Adherence' },
+                                        { label: 'Site Std. Rate', val: '94.2%', status: WARNING, desc: 'Cross-plant alignment' },
+                                        { label: 'Energy per Unit', val: '-12.4%', status: SUCCESS, desc: 'Mission Zero progress' },
+                                        { label: 'Scope 3 Sync', val: '78.5%', status: SUCCESS, desc: 'Supplier material sync' }
+                                    ].map((kpi, i) => (
+                                        <div key={i} className="bg-white p-5 border-l-4 shadow-sm" style={{ borderLeftColor: kpi.status }}>
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{kpi.label}</p>
+                                            <p className="text-2xl font-black mt-1 text-black">{kpi.val}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-12 gap-6">
+                                    <div className="col-span-12 lg:col-span-4 bg-white p-8 rounded border border-gray-100 shadow-sm text-center">
+                                        <div className="flex justify-center mb-4"><Icon name="Leaf" className="text-emerald-500" size={40} /></div>
+                                        <h3 className="text-xl font-black uppercase tracking-tighter text-black">Emissions Profile</h3>
+                                        <div className="h-64 mt-4">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Pie data={esgData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                        {esgData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                                                    </Pie>
+                                                    <Tooltip />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-12 lg:col-span-8 bg-white p-6 rounded border border-gray-100 shadow-sm">
+                                        <h3 className="text-sm font-black uppercase tracking-tighter text-black mb-8">Multi-Site Environmental Standardization</h3>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead><tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100"><th className="pb-4">Site</th><th className="pb-4 text-center">Energy Std</th><th className="pb-4 text-center">Waste Std</th><th className="pb-4 text-right">Compliance</th></tr></thead>
+                                                <tbody className="divide-y divide-slate-50">
+                                                    {plantStandardization.map((site, idx) => (
+                                                        <tr key={idx}>
+                                                            <td className="py-4 font-bold text-sm text-slate-700">{site.plant}</td>
+                                                            <td className="py-4 text-center text-xs font-bold text-slate-600">{site.energy}%</td>
+                                                            <td className="py-4 text-center text-xs font-bold text-slate-600">{site.waste}%</td>
+                                                            <td className="py-4 text-right"><span className="px-2 py-0.5 rounded text-[9px] font-black bg-emerald-100 text-emerald-700 uppercase">{site.compliance}%</span></td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB 4: CUSTOMER */}
+                        {activeTab === 'customer' && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    {[
+                                        { label: 'CSAT Index', val: '4.85 / 5', icon: 'Activity' },
+                                        { label: 'Retailer Visibility', val: '92.4%', icon: 'Globe' },
+                                        { label: 'Collab Efficiency', val: '96.8%', icon: 'Share2' },
+                                        { label: 'Governance SOT', val: '100%', icon: 'Shield' }
+                                    ].map((kpi, i) => (
+                                        <div key={i} className="bg-white p-5 border-l-4 shadow-sm border-l-red-600">
+                                            <div className="flex justify-between items-start"><p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{kpi.label}</p><Icon name={kpi.icon} size={14} className="text-red-600" /></div>
+                                            <p className="text-2xl font-black mt-1 text-black">{kpi.val}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-12 gap-6">
+                                    <div className="col-span-12 lg:col-span-8 bg-white p-6 rounded border border-gray-100 shadow-sm">
+                                        <h3 className="text-sm font-black uppercase tracking-tighter text-black mb-8 text-center">CSAT Index vs Service Level Correlation</h3>
+                                        <div className="h-80">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <ComposedChart data={fulfillmentTrend}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700 }} />
+                                                    <YAxis yAxisId="l" axisLine={false} tickLine={false} domain={[90, 100]} />
+                                                    <YAxis yAxisId="r" orientation="right" axisLine={false} tickLine={false} domain={[0, 5]} />
+                                                    <Tooltip />
+                                                    <Bar yAxisId="l" dataKey="fillRate" fill={CUMMINS_BLACK} radius={[2, 2, 0, 0]} />
+                                                    <Line yAxisId="r" type="monotone" dataKey="csat" stroke={CUMMINS_RED} strokeWidth={4} dot={{ r: 6, fill: CUMMINS_RED, strokeWidth: 2, stroke: '#fff' }} />
+                                                </ComposedChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-12 lg:col-span-4 bg-slate-900 p-8 rounded shadow-xl text-center flex flex-col justify-center relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-10 opacity-5"><Icon name="Shield" size={120} className="text-white" /></div>
+                                        <div className="relative z-10">
+                                            <h4 className="text-red-600 text-[9px] font-black uppercase tracking-[0.3em] mb-4">Governance Framework</h4>
+                                            <h3 className="text-2xl font-black uppercase tracking-tighter text-white mb-4 italic">Unified Revenue Orders</h3>
+                                            <p className="text-slate-400 text-sm leading-relaxed mb-6">Single Source of Truth synchronization across global commitment nodes.</p>
+                                            <div className="text-4xl font-black text-white italic">100% Sync</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB 5: MODERN AI */}
+                        {activeTab === 'modern' && (
+                            <div className="space-y-6">
+                                <div className="bg-slate-900 p-8 rounded shadow-2xl flex flex-col lg:flex-row items-center gap-12 text-white relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-12 opacity-5"><Icon name="Cpu" size={140} /></div>
+                                    <div className="relative z-10 flex-1">
+                                        <h2 className="text-3xl font-black uppercase tracking-tighter mb-4 italic underline decoration-red-600 decoration-4 underline-offset-8">Predictive Core 2026</h2>
+                                        <p className="text-sm text-slate-400 font-medium leading-relaxed mb-8">AI-driven auto-selection algorithms optimizing global signals with 14-day production early warnings.</p>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-white/5 border border-white/10 p-4 rounded text-center"><p className="text-2xl font-black">85.4%</p><p className="text-[8px] font-black text-red-600 uppercase">ML Accuracy</p></div>
+                                            <div className="bg-white/5 border border-white/10 p-4 rounded text-center"><p className="text-2xl font-black">4ms</p><p className="text-[8px] font-black text-red-600 uppercase">Mesh Latency</p></div>
+                                        </div>
+                                    </div>
+                                    <div className="relative z-10 flex-1 w-full bg-white/5 p-6 rounded border border-white/10">
+                                        <h4 className="text-[10px] font-black uppercase text-white mb-6 underline decoration-red-600 underline-offset-4 tracking-[0.2em]">Accuracy Gain vs Traditional</h4>
+                                        <div className="h-64">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <AreaChart data={aiAccuracyData}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" />
+                                                    <XAxis dataKey="name" stroke="#666" fontSize={10} axisLine={false} />
+                                                    <YAxis stroke="#666" fontSize={10} domain={[40, 100]} axisLine={false} />
+                                                    <Tooltip />
+                                                    <Area type="monotone" dataKey="ml" stroke={CUMMINS_RED} fill={CUMMINS_RED} fillOpacity={0.2} strokeWidth={3} name="AI Prediction" />
+                                                    <Area type="monotone" dataKey="trad" stroke="#666" fill="transparent" strokeWidth={2} strokeDasharray="5 5" name="Traditional Stat" />
+                                                </AreaChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="bg-white p-6 rounded border border-gray-100 border-t-4 border-t-red-600 shadow-sm">
+                                        <div className="flex items-center gap-2 mb-4"><Icon name="Target" className="text-red-600"/><h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Inventory Precision</h4></div>
+                                        <p className="text-2xl font-black uppercase">+10.2% Accuracy Gain</p>
+                                        <p className="text-[9px] text-emerald-600 font-bold uppercase mt-1">AI-Optimized Buffer Signaling</p>
+                                    </div>
+                                    <div className="bg-white p-6 rounded border border-gray-100 border-t-4 border-t-black shadow-sm">
+                                        <div className="flex items-center gap-2 mb-4"><Icon name="Layers" className="text-red-600"/><h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Unified Architecture</h4></div>
+                                        <p className="text-2xl font-black uppercase">94% Core System Sync</p>
+                                        <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">Enterprise-Wide Real-Time Interoperability</p>
+                                    </div>
+                                    <div className="bg-white p-6 rounded border border-gray-100 border-t-4 border-t-black shadow-sm">
+                                        <div className="flex items-center gap-2 mb-4"><Icon name="Activity" className="text-red-600"/><h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">IoT Telemetry Coverage</h4></div>
+                                        <p className="text-2xl font-black uppercase">75.2% Live Connectivity</p>
+                                        <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">End-to-End Asset Awareness</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Global Action Footer */}
+                    <footer className="max-w-[1600px] mx-auto px-6 mt-12 pt-8 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center gap-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></div>
+                            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest tracking-wider">Enterprise Intelligence Node Synchronized | Cummins Global Supply Chain</p>
+                        </div>
+                        <div className="flex gap-4">
+                            <button className="px-4 py-2 border border-black text-[10px] font-black uppercase rounded hover:bg-black hover:text-white transition-all tracking-widest">Download Full Report</button>
+                            <button className="px-4 py-2 bg-red-600 text-white text-[10px] font-black uppercase rounded hover:bg-black transition-all tracking-widest">Enterprise Audit</button>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
